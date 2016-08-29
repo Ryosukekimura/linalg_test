@@ -60,6 +60,12 @@ class model3d_plus(model3d):
             return self.f_normals
         return -1
 
+    def Normalization(self,vec):
+        norm = np.linalg.norm(vec)
+        nvec = vec / norm
+        #print "normal norm",np.linalg.norm(nvec)
+        return nvec
+
     def calc_normal2(self):
         #法線ベクトルの正規化を行っている
         if self.face_flag == True:
@@ -71,9 +77,10 @@ class model3d_plus(model3d):
             Ct = C.transpose()
 
             for b in xrange(self.face_num):
-                norm = np.linalg.norm(Ct[:,b])
-                nt = Ct[:,b]
-                Ct[:,b] = nt / norm
+                Ct[:,b] = self.Normalization(Ct[:,b])
+                #norm = np.linalg.norm(Ct[:,b])
+                #nt = Ct[:,b]
+                #Ct[:,b] = nt / norm
 
             self.f_normals = Ct
             return self.f_normals
@@ -119,81 +126,87 @@ class model3d_changeLo(model3d_plus):
         """col0 center col1 x col2 y col3 z"""
 
     def calc_local_coord(self):
+        """ face１つにローカル座標１つ"""
 
         init_axis = np.array([[0,1,0,0],
                               [0,0,1,0],
                               [0,0,0,1],
                               [1,1,1,1]])
 
-        for a in xrange(self.face_num):
-            print "f num",a
+        for fnum in xrange(self.face_num):
 
-            x_axises_vec = self.vertexes[:,self.faces[:,a]] - self.face_centers[:,a].reshape(3,1)
-            print x_axises_vec
+            face_first = self.faces[0,fnum] #faceの最初にくるやつ
 
-            x_axis = np.empty([3, self.ver_num])
-            x_axis = self.vertexes[:,self.faces[:,a]]
+            print "f num",fnum
 
-            print "x_axis"
-            print x_axis
+            print self.vertexes[:,face_first]
 
-            z_axis = self.f_normals[:,a].reshape(3,1) + self.face_centers[:,a].reshape(3,1)
+            #X axis
+            x_axis_vec = self.vertexes[:,face_first] - self.face_centers[:,fnum]
+            print "x_axis_vec",x_axis_vec
+            x_axises_vec_no = self.Normalization(x_axis_vec)
+            print "x_axis_vec_no", x_axises_vec_no
+            print "x_axis_vec_no norm", np.linalg.norm(x_axises_vec_no)
+
+            x_axis = x_axises_vec_no + self.vertexes[:,face_first]
+
+            print "x_axis",x_axis
+
+            #Z axis
+            z_axis = self.f_normals[:,fnum] + self.face_centers[:,fnum] #z axis point
+            print "z axis vec"
+            print self.f_normals[:,fnum]
             print "z axis"
             print z_axis
 
-            y_axis_vec = np.empty([3,3])
-            for b in xrange(3):
-                temp = np.cross(x_axises_vec[:,b], self.f_normals[:,a])
-                y_axis_vec[:,b] = temp
-                print temp
 
+            # Y axis
+            y_axis_vec = np.cross(x_axises_vec_no, self.f_normals[:,fnum])
+            y_axis_vec_no = self.Normalization(y_axis_vec)
 
-            print "y_axis"
+            print "y_axis_vec"
             print y_axis_vec
 
-            y_axis = y_axis_vec + self.face_centers[:,a].reshape(3,1)
+            y_axis = y_axis_vec_no + self.face_centers[:,fnum]
             print "y_axis",y_axis
 
             solves = np.empty([4,12])
 
             datas = np.empty([3,3])
 
-            for num in xrange(3):
+            x = x_axis
+            print "x norm",np.linalg.norm(x)
 
-                x = x_axis[:,num]
-                data = x
-                x = x/np.linalg.norm(x)
+            y = y_axis
+            print "y norm",np.linalg.norm(y)
 
-                y = y_axis[:,num]
-                y = y/np.linalg.norm(y)
+            z = z_axis
+            print "z norm",np.linalg.norm(z)
 
-                z = z_axis
-                z = z/np.linalg.norm(z)
+            c = self.face_centers
 
-                c = self.face_centers
-                c = c /np.linalg.norm(c)
+            ones = np.array([[1,1,1,1]])
 
-                zero = np.array([[1,1,1,1]])
+            axis = np.c_[c,x.reshape([3,1])]
+            axis = np.c_[axis,y.reshape([3,1])]
+            axis = np.c_[axis,z.reshape([3,1])]
 
-                axis = np.c_[c,x.reshape([3,1])]
-                axis = np.c_[axis,y.reshape([3,1])]
-                axis = np.c_[axis,z]
+            axis = np.r_[axis,ones]
+            print "axis",axis
+            np.savetxt("axis%03d.txt" % fnum ,axis.transpose(),fmt= '%.10f')
+            init_inv = np.linalg.inv(init_axis.transpose())
+            print init_inv
 
-                axis = np.r_[axis,zero]
-                print axis
-                init_inv = np.linalg.inv(init_axis.transpose())
-                print init_inv
+            solve = axis.dot(init_inv)
+            print "solve",solve
 
-                solve = axis * init_inv
-                print "solve",solve
+            for num2 in xrange(self.ver_num):
+                data = self.vertexes[:,num2]
 
-                for num2 in xrange(self.ver_num):
-                    data = self.vertexes[:,num2]
-
-                    data = np.append(data,1)
-                    test = solve.dot(data.reshape([4,1]))
-                    print "test",test
-                    np.savetxt("testp%03d.txt" % num2, test.reshape([1,4]), fmt='%.10f')
+                data = np.append(data,1)
+                test = solve.dot(data.reshape([4,1]))
+                print "test",test
+                np.savetxt("testp%03d.txt" % num2, test.reshape([1,4]), fmt='%.10f')
 
 
 
