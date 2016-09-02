@@ -1,9 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import model3d_kimu_utils as mku
 import affine_me as affine
-import tenbo_utils as tu
-import get_nearplane_index as gni
+
+import time
+
+"""""
+model3d :
+    ３次元メッシュの基本クラス
+    基本的にデータの保持
+
+model3d_plus:
+    ply読み込み,法線計算,正規化,メッシュの重心計算,三角形の重心計算
+
+model3d_changeLo :
+    表面ごとのローカル座標を作成するクラス
+
+"""""
 
 #基本3dmodelクラス
 class model3d:
@@ -43,27 +57,15 @@ class model3d_plus(model3d):
 
     def read_ply(self,fileName):
         """ply読み込み ＊要 tenbo_utils"""
-        v, f = tu.load_ply_file(fileName)
+        v, f = mku.load_ply_file(fileName)
         self.input_data(v, f)
 
     def write_ply(self,name):
-        tu.save_ply_file(name,self.vertexes,self.faces)
-
-    def calc_normal(self):
-        """faceごとの法線"""
-        if self.face_flag == True:
-            ab = self.vertexes[:, self.faces[1, :]] - self.vertexes[:, self.faces[0, :]]
-            ac = self.vertexes[:, self.faces[2, :]] - self.vertexes[:, self.faces[0, :]]
-
-            C = np.cross(ab.transpose(),ac.transpose())
-            self.f_normals = C.transpose()
-            return self.f_normals
-        return -1
+        mku.save_ply_file(name,self.vertexes,self.faces)
 
     def Normalization(self,vec):
         norm = np.linalg.norm(vec)
         nvec = vec / norm
-        #print "normal norm",np.linalg.norm(nvec)
         return nvec
 
     def calc_normal2(self):
@@ -78,9 +80,6 @@ class model3d_plus(model3d):
 
             for b in xrange(self.face_num):
                 Ct[:,b] = self.Normalization(Ct[:,b])
-                #norm = np.linalg.norm(Ct[:,b])
-                #nt = Ct[:,b]
-                #Ct[:,b] = nt / norm
 
             self.f_normals = Ct
             return self.f_normals
@@ -88,10 +87,12 @@ class model3d_plus(model3d):
 
     def calc_point_normal(self):
         """点ごとの法線"""
+        """
         if self.face_flag == True:
             self.p_normals = gni.calculate_normal(self.vertexes, self.faces)
             self.normal_flag = True
             return self.p_normals
+        """
         return -1
 
     def calc_center(self):
@@ -115,98 +116,100 @@ class model3d_plus(model3d):
         self.calc_center()
 
         if self.face_flag == True:
-            self.calc_point_normal()
+            #self.calc_point_normal()
             self.calc_face_center()
             self.calc_normal2()
 
+
+
+#faceごとのローカル座標を計算するクラス
 class model3d_changeLo(model3d_plus):
 
     def __init__(self):
-        self.local_coord = np.empty([3,4])
+        self.local_c_list = []
         """col0 center col1 x col2 y col3 z"""
+
+    def deform_p(self, rigid_t,vertexes):
+        row, col = vertexes.shape
+        dM = np.empty([3, col])
+
+        for verNum in xrange(col):
+            data = vertexes[:, verNum]
+            data = np.hstack((data, 1))
+            tran_p = rigid_t.dot(data.reshape([4, 1]))
+            tran_p = tran_p[0:3, :]
+            dM[:, verNum] = tran_p.reshape([1, 3])
+
+        return dM.reshape([3, col])
 
     def calc_local_coord(self):
         """ face１つにローカル座標１つ"""
+
+        start = time.time()
 
         init_axis = np.array([[0,1,0,0],
                               [0,0,1,0],
                               [0,0,0,1],
                               [1,1,1,1]])
 
+
         for fnum in xrange(self.face_num):
 
             face_first = self.faces[0,fnum] #faceの最初にくるやつ
 
-            print "f num",fnum
-
-            print self.vertexes[:,face_first]
-
             #X axis
             x_axis_vec = self.vertexes[:,face_first] - self.face_centers[:,fnum]
-            print "x_axis_vec",x_axis_vec
             x_axises_vec_no = self.Normalization(x_axis_vec)
-            print "x_axis_vec_no", x_axises_vec_no
-            print "x_axis_vec_no norm", np.linalg.norm(x_axises_vec_no)
-
-            x_axis = x_axises_vec_no + self.vertexes[:,face_first]
-
-            print "x_axis",x_axis
+            x_axis = x_axises_vec_no + self.face_centers[:,fnum]
 
             #Z axis
             z_axis = self.f_normals[:,fnum] + self.face_centers[:,fnum] #z axis point
-            print "z axis vec"
-            print self.f_normals[:,fnum]
-            print "z axis"
-            print z_axis
-
+            z_axis_n = self.Normalization(z_axis)
 
             # Y axis
             y_axis_vec = np.cross(x_axises_vec_no, self.f_normals[:,fnum])
             y_axis_vec_no = self.Normalization(y_axis_vec)
-
-            print "y_axis_vec"
-            print y_axis_vec
-
             y_axis = y_axis_vec_no + self.face_centers[:,fnum]
-            print "y_axis",y_axis
-
-            solves = np.empty([4,12])
-
-            datas = np.empty([3,3])
 
             x = x_axis
-            print "x norm",np.linalg.norm(x)
-
             y = y_axis
-            print "y norm",np.linalg.norm(y)
-
             z = z_axis
-            print "z norm",np.linalg.norm(z)
-
-            c = self.face_centers
+            c = self.face_centers[:,fnum]
 
             ones = np.array([[1,1,1,1]])
 
-            axis = np.c_[c,x.reshape([3,1])]
+            axis = np.c_[c.reshape([3,1]),x.reshape([3,1])]
             axis = np.c_[axis,y.reshape([3,1])]
             axis = np.c_[axis,z.reshape([3,1])]
-
+            #np.savetxt("./deform/axis%03d.txt" % fnum, axis.transpose(), fmt='%.10f')
             axis = np.r_[axis,ones]
-            print "axis",axis
-            np.savetxt("axis%03d.txt" % fnum ,axis.transpose(),fmt= '%.10f')
-            init_inv = np.linalg.inv(init_axis.transpose())
-            print init_inv
+            axis_t = axis.transpose()
+            init_inv = np.linalg.inv(init_axis)
+            #print init_inv
 
             solve = axis.dot(init_inv)
-            print "solve",solve
+            self.local_c_list.append(solve)
 
-            for num2 in xrange(self.ver_num):
-                data = self.vertexes[:,num2]
+            #print "solve",solve
+            """
+            #確認用
+            dm = self.deform_p(solve,self.vertexes)
+            wri = model3d_plus()
+            wri.input_data(dm,self.faces)
+            wri.write_ply("./deform/deform_test%03d.ply"%fnum)
 
-                data = np.append(data,1)
-                test = solve.dot(data.reshape([4,1]))
-                print "test",test
-                np.savetxt("testp%03d.txt" % num2, test.reshape([1,4]), fmt='%.10f')
+            solve_inv = np.linalg.inv(solve)
+            dm_inv = self.deform_p(solve_inv,dm)
+            wri.input_data(dm_inv,self.faces)
+            wri.write_ply("./deform/deform_inv_test%03d.ply" % fnum)
+            """
+
+        elapsed_time = time.time() - start
+        print ("elapsed_time:{0}".format(elapsed_time)) + "[sec]"
+
+
+
+
 
 
 
