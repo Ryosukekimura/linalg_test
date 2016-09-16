@@ -64,12 +64,15 @@ class model3d_plus(model3d):
         mku.save_ply_file(name,self.vertexes,self.faces)
 
     def Normalization(self,vec):
+
         norm = np.linalg.norm(vec)
+        print "norm",norm
         nvec = vec / norm
+        print "nvec",nvec
         return nvec
 
     def calc_normal2(self):
-        #法線ベクトルの正規化を行っている
+        #法線ベクトルの正規化を行っている→解除　バグあり
         if self.face_flag == True:
             ab = self.vertexes[:, self.faces[1, :]] - self.vertexes[:, self.faces[0, :]]
             ac = self.vertexes[:, self.faces[2, :]] - self.vertexes[:, self.faces[0, :]]
@@ -78,10 +81,12 @@ class model3d_plus(model3d):
 
             Ct = C.transpose()
 
-            for b in xrange(self.face_num):
-                Ct[:,b] = self.Normalization(Ct[:,b])
+            #for b in xrange(self.face_num):
+            #    a = self.Normalization(Ct[:,b])
+            #    print "a re",a.reshape(3,1)
 
             self.f_normals = Ct
+            print self.f_normals
             return self.f_normals
         return -1
 
@@ -113,6 +118,7 @@ class model3d_plus(model3d):
             return c/3.0
 
     def calc_all(self):
+        print "calc normal,face center,center"
         self.calc_center()
 
         if self.face_flag == True:
@@ -126,7 +132,8 @@ class model3d_plus(model3d):
 class model3d_changeLo(model3d_plus):
 
     def __init__(self):
-        self.local_c_list = []
+        self.solves = []
+
         """col0 center col1 x col2 y col3 z"""
 
     def deform_p(self, rigid_t,vertexes):
@@ -152,9 +159,8 @@ class model3d_changeLo(model3d_plus):
                               [0,0,0,1],
                               [1,1,1,1]])
 
-
         for fnum in xrange(self.face_num):
-
+            print "start calc local coord"
             face_first = self.faces[0,fnum] #faceの最初にくるやつ
 
             #X axis
@@ -163,11 +169,13 @@ class model3d_changeLo(model3d_plus):
             x_axis = x_axises_vec_no + self.face_centers[:,fnum]
 
             #Z axis
-            z_axis = self.f_normals[:,fnum] + self.face_centers[:,fnum] #z axis point
+            z_axis = self.Normalization(self.f_normals[:,fnum]) + self.face_centers[:,fnum] #z axis point
             z_axis_n = self.Normalization(z_axis)
 
             # Y axis
+            print " normal",self.f_normals[:,fnum]
             y_axis_vec = np.cross(x_axises_vec_no, self.f_normals[:,fnum])
+            print "y_axis vec",y_axis_vec
             y_axis_vec_no = self.Normalization(y_axis_vec)
             y_axis = y_axis_vec_no + self.face_centers[:,fnum]
 
@@ -181,32 +189,34 @@ class model3d_changeLo(model3d_plus):
             axis = np.c_[c.reshape([3,1]),x.reshape([3,1])]
             axis = np.c_[axis,y.reshape([3,1])]
             axis = np.c_[axis,z.reshape([3,1])]
-            #np.savetxt("./deform/axis%03d.txt" % fnum, axis.transpose(), fmt='%.10f')
+            np.savetxt("./deform_pre2/axis%03d.txt" % fnum, axis.transpose(), fmt='%.10f')
             axis = np.r_[axis,ones]
-            axis_t = axis.transpose()
             init_inv = np.linalg.inv(init_axis)
+            axis_inv = np.linalg.inv(axis)
             #print init_inv
 
-            solve = axis.dot(init_inv)
-            self.local_c_list.append(solve)
+            #solve = axis.dot(init_inv)
+            solve = init_axis.dot(axis_inv)
+            self.solves.append(solve)
 
             #print "solve",solve
-            """
+
             #確認用
+
             dm = self.deform_p(solve,self.vertexes)
             wri = model3d_plus()
             wri.input_data(dm,self.faces)
-            wri.write_ply("./deform/deform_test%03d.ply"%fnum)
+            wri.write_ply("./deform_pre2/deform_test%03d.ply"%fnum)
 
             solve_inv = np.linalg.inv(solve)
             dm_inv = self.deform_p(solve_inv,dm)
             wri.input_data(dm_inv,self.faces)
-            wri.write_ply("./deform/deform_inv_test%03d.ply" % fnum)
-            """
+            wri.write_ply("./deform_pre2/deform_inv_test%03d.ply" % fnum)
+
 
         elapsed_time = time.time() - start
         print ("elapsed_time:{0}".format(elapsed_time)) + "[sec]"
-
+        return solve
 
 
 
