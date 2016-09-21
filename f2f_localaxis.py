@@ -3,6 +3,7 @@
 import numpy as np
 import model3d_kimu as m3d
 import model3d_kimu_utils as mut
+import m2m_distance as md
 import os
 import time
 import csv
@@ -21,7 +22,7 @@ def rearrange_dist(dist):
 
 def calc_one_frame(model1,model2):
 
-    dist_list = mut.calc_f2f_distance(model1, model2)
+    dist_list = md.calc_f2f_distance(model1, model2)
 
     frame_dist = []
     frame_dist_r = []
