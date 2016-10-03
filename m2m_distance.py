@@ -1,17 +1,36 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import math
 import skimage.color
 import model3d_kimu as m3d
+import model3d_kimu_utils as mut
+
 
 """""face to face の距離を求める
     mesh2 - mesh1 を行う
 """""
 
 kbegin = 0
-kend = 255
-kmin = -5
-kmax = 5
+kend = 127
+kmin = 0
+kmax = 0
+
+def calc_f2f_distance_in_localcoord(mesh1,mesh2):
+    f2 = mesh2.faces
+    v2 = mesh2.vertexes
+    f1 = mesh1.faces
+    v1 = mesh1.vertexes
+
+    row, col = f2.shape
+
+    distList = []
+
+    for s in xrange(col):
+        dist = mut.change_local(v2[:, f2[:, s]],mesh1.solves[s]) - mut.change_local(v1[:, f1[:, s]],mesh1.solves[s])
+        distList.append(dist)
+
+    return distList
 
 def calc_f2f_distance(mesh1,mesh2):
 
@@ -79,6 +98,9 @@ def makeColorVecList(colorlist,faceNum=0,r=0,g=0,b=0):
     color = np.array([[127 for i in xrange(faceNum)],
                     [127 for i in xrange(faceNum)],
                     [127 for i in xrange(faceNum)]])
+
+    color[0, :] = colorlist
+
     if r != 0:
         color[0, :] = colorlist
     if g != 0:
@@ -88,30 +110,137 @@ def makeColorVecList(colorlist,faceNum=0,r=0,g=0,b=0):
 
     return color
 
+def makeColorVecList2(colorlist,faceNum=0):
+
+    color = np.array([[127 for i in xrange(faceNum)],
+                    [255 for i in xrange(faceNum)],
+                    [127 for i in xrange(faceNum)]])
+
+    color = np.empty([3,faceNum])
+
+    colorlistnp = np.array(colorlist)
+    color[2, :] = colorlistnp + 127
+    color[1, :] = 255 - np.absolute(colorlistnp)
+    color[0, :] = 127 - colorlistnp
+
+    return color
+
+def vec2norm(dist):
+    var,col = dist.shape
+    norms = []
+    for x in xrange(col):
+        vec = dist[:,x]
+        nr = np.linalg.norm(vec)
+        norms.append(nr)
+    return norms
+
+def dist2color(dist):
+
+    b = (dist - kmin)*(kend - kbegin) / (kmax -kmin) + kbegin
+
+    return b
+
+
+def dist2color_fix(dist):
+    color = []
+
+
+    for x in dist:
+        #print "x",x
+        if x < 0:
+            a = 0-x
+        else:
+            a = x
+
+        b = (a - kmin) * (kend - kbegin) / ((kmax - kmin) + kbegin)
+
+        if x < 0:
+            b = 0-b
+
+
+        color.append(b)
+
+    return color
+
+def color2color_x_3(color):
+    var, col = color.shape
+
+    rcolor = np.empty([3,col*3])
+
+    x=0
+    y=0
+
+    while x < col*3:
+        #print color[:,y]
+        rcolor[:,x] = color[:,y]
+        rcolor[:,x+1] = color[:,y]
+        rcolor[:,x+2] = color[:,y]
+        y += 1
+        x += 3
+
+    return rcolor
+
 def distancelist2colorlist(distanceList):
     """red:x green:y blue:z"""
 
     faceColors = []
     colorList = []
+    colorllist3 = []
     facedist = divideDistanceList(distanceList)
+
+    convdist = conbineDistanceList(distanceList)
+
+    global kmax,kmin
+    kmax = convdist.max()
+    kmin = convdist.min()
+
+
+    """
+    if kmax < math.fabs(kmin):
+        kmax = math.fabs(kmin)
+    else:
+        kmin = -kmax
+    """
 
     for x in xrange(3):
         """face is triangle from 3 points ,so x < 3 """
+        #print "face dist",facedist[x]
         distx,disty,distz = dividexyz(facedist[x])
         facecolor = []
-        print "face num:",x
-        distcolorx = dist2color(distx)
-        distcolory = dist2color(disty)
-        distcolorz = dist2color(distz)
+        facecolor3 = []
+        facecolornorm = []
+        distcolorx = dist2color_fix(distx)
+        distcolory = dist2color_fix(disty)
+        distcolorz = dist2color_fix(distz)
+
+        #normを計算した場合
+        dnorms = vec2norm(facedist[x])
+        kmax = max(dnorms)
+        kmin = min(dnorms)
+        colors = dist2color_fix(dnorms)
+        dcpy = np.array(colors)
+        dc = makeColorVecList2(dcpy,faceNum=len(dcpy))
+        dc3 = color2color_x_3(dc)
+        facecolornorm.append(dc3)
+        facecolornorm.append(dc3)
+        facecolornorm.append(dc3)
 
         """0:x 1:y 2:z"""
-        facecolor[0] = makeColorVecList(distcolorx, faceNum=len(distcolorx), r=1)
-        facecolor[1] = makeColorVecList(distcolorx, faceNum=len(distcolory), g=1)
-        facecolor[2] = makeColorVecList(distcolorx, faceNum=len(distcolorz), b=1)
+        facecolor.append(makeColorVecList2(distcolorx, faceNum=len(distcolorx)))
+        facecolor.append(makeColorVecList2(distcolory, faceNum=len(distcolory)))
+        facecolor.append(makeColorVecList2(distcolorz, faceNum=len(distcolorz)))
+        colorList.append(facecolor)
 
-        colorList[x] = facecolor
+        x3 = color2color_x_3(facecolor[0])
+        facecolor3.append(x3)
+        y3 = color2color_x_3(facecolor[1])
+        facecolor3.append(y3)
+        z3 = color2color_x_3(facecolor[2])
+        facecolor3.append(z3)
 
-    return colorList
+        colorllist3.append(facecolor3)
+
+    return colorList,colorllist3
 
 def dividexyz(facedist):
     distx = facedist[0,:]
@@ -119,10 +248,6 @@ def dividexyz(facedist):
     distz = facedist[2,:]
 
     return distx,disty,distz
-
-def dist2color(dist):
-    b = (dist - kmin)*(kend - kbegin) / ((kmax -kmin) + kbegin)
-    return b
 
 def divide_face(mesh):
     v = mesh.vertexes
@@ -146,3 +271,8 @@ def divide_face(mesh):
         count = count + 3
 
     return ov,of
+
+def colorlist_conv(colorlist):
+
+    return 0
+

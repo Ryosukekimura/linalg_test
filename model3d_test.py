@@ -27,7 +27,7 @@ def test():
 
     t = m3d.model3d_plus()
 
-    t.read_ply("../data/move/move0-shape.ply")
+    t.read_ply("./data/move/move00-shape.ply")
 
     t.calc_all()
     print "f,no",t.f_normals
@@ -70,6 +70,6 @@ def test2():
 
 
 if __name__ == "__main__":
-    #test()
-    test2()
+    test()
+    #test2()
     #test3()

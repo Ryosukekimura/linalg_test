@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 
     local_dists = []
-    inputdir = "../data/move"
+    inputdir = "./data/move"
     outdir = "./local_dist"
 
     files = os.listdir(inputdir)
