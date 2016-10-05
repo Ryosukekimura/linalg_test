@@ -220,7 +220,7 @@ def test2():
     if os.path.exists(out) == False:
         os.mkdir(out)
 
-    for z in xrange(14):
+    for z in xrange(1):
 
         m1 = m3d.model3d_changeLo()
         m2 = m3d.model3d_changeLo()
@@ -236,7 +236,7 @@ def test2():
         dist = md.calc_f2f_distance_in_localcoord(m1,m2)
         #dist = md.calc_f2f_distance(m2, m1)
         c1, c2 = md.distancelist2colorlist(dist)
-
+        print "C2",c2
         nv, nf = md.divide_face(m1)
 
         frame = out + "frame%02d/" % z

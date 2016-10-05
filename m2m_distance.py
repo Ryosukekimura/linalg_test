@@ -12,7 +12,7 @@ import model3d_kimu_utils as mut
 """""
 
 kbegin = 0
-kend = 127
+kend = 1
 kmin = 0
 kmax = 0
 
@@ -140,26 +140,48 @@ def dist2color(dist):
 
     return b
 
-
 def dist2color_fix(dist):
     color = []
 
-
     for x in dist:
-        #print "x",x
+        # print "x",x
         if x < 0:
-            a = 0-x
+            a = 0 - x
         else:
             a = x
 
         b = (a - kmin) * (kend - kbegin) / ((kmax - kmin) + kbegin)
 
         if x < 0:
-            b = 0-b
-
+            b = 0 - b
 
         color.append(b)
 
+    return color
+
+def calcPseudoColor(dist,shift = 0.0):
+    shift += math.pi + math.pi / 4
+    calvec = np.empty(3)
+
+    calvec[0] = int( (255 * (math.sin(1.5 * math.pi * dist + shift + math.pi) + 1.0)) / 2.0 )
+    calvec[1] = int( (255 * (math.sin(1.5 * math.pi * dist + shift + math.pi / 2.0 ) + 1.0)) / 2.0 )
+    calvec[2] = int( (255 * (math.sin(1.5 * math.pi * dist + shift ) + 1.0)) / 2.0 )
+
+    #print "color", calvec.reshape([3,1])
+    return calvec.reshape([3,1])
+
+def dist2color2(dist):
+    color = np.empty(0)
+
+    b = (dist - kmin) * (kend - kbegin) / (kmax - kmin) + kbegin
+
+
+    color = calcPseudoColor(b[0])
+    for i in b[1:]:
+        c = calcPseudoColor(i)
+        color = np.hstack([color,c])
+
+    print "color",color
     return color
 
 def color2color_x_3(color):
@@ -213,31 +235,48 @@ def distancelist2colorlist(distanceList):
         distcolory = dist2color_fix(disty)
         distcolorz = dist2color_fix(distz)
 
+        colorx = dist2color2(distx)
+        colory = dist2color2(disty)
+        colorz = dist2color2(distz)
+        colorx3 = color2color_x_3(colorx)
+        colory3 = color2color_x_3(colory)
+        colorz3 = color2color_x_3(colorz)
+        facecolor3.append(colorx3)
+        facecolor3.append(colory3)
+        facecolor3.append(colorz3)
+
+        print "colorx",colorx
+
+        """
         #normを計算した場合
+        """
+        """
         dnorms = vec2norm(facedist[x])
         kmax = max(dnorms)
         kmin = min(dnorms)
-        colors = dist2color_fix(dnorms)
+        colors = dist2color2(dnorms)
         dcpy = np.array(colors)
         dc = makeColorVecList2(dcpy,faceNum=len(dcpy))
         dc3 = color2color_x_3(dc)
         facecolornorm.append(dc3)
         facecolornorm.append(dc3)
         facecolornorm.append(dc3)
+        """
 
-        """0:x 1:y 2:z"""
+        """
         facecolor.append(makeColorVecList2(distcolorx, faceNum=len(distcolorx)))
         facecolor.append(makeColorVecList2(distcolory, faceNum=len(distcolory)))
         facecolor.append(makeColorVecList2(distcolorz, faceNum=len(distcolorz)))
         colorList.append(facecolor)
 
         x3 = color2color_x_3(facecolor[0])
+        print "x3",x3
         facecolor3.append(x3)
         y3 = color2color_x_3(facecolor[1])
         facecolor3.append(y3)
         z3 = color2color_x_3(facecolor[2])
         facecolor3.append(z3)
-
+        """
         colorllist3.append(facecolor3)
 
     return colorList,colorllist3
