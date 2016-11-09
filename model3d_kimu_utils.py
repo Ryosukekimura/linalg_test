@@ -6,6 +6,23 @@ import model3d_kimu as m3d
 import m2m_distance as md
 import os
 import f2f_localaxis as f2f
+import re
+import errno
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+def makedir(dir):
+
+    if os.path.exists(dir) == False:
+        os.mkdir(dir)
+    return dir
 
 def change_local(face_dist,affine):
     """face_dist 3x3 affine 4x4"""
@@ -169,9 +186,19 @@ def data3():
     return v,f
 
 def data4():
-    v = np.array([[0, 1, 5]
-                , [0, 2, 1]
-                , [1, 0, 0]])
+    v = np.array([[0, 2, 0]
+                , [0, 0, 2]
+                , [1, 1, 1]])
+
+    f = np.array([[0],
+                  [1],
+                  [2]])
+    return v,f
+
+def data5():
+    v = np.array([[0.1, 0.2, 0.3]
+                , [1, 2, 3]
+                , [10, 20, 30]])
 
     f = np.array([[0],
                   [1],
@@ -184,88 +211,19 @@ def red():
                  ,[0,   0,  0, 0]])
     return c
 
-def test1():
+if __name__ == "__main__":
 
-    v1,f1 = data()
-    v2,f2 = data2()
-    c1 = red()
+    v1,f1 = data3()
+    v2,f2 = data4()
 
     m1 = m3d.model3d_changeLo()
-    m1.input_data(v1,f1)
-    m1.write_ply("m1.ply")
-
     m2 = m3d.model3d_changeLo()
+    m1.input_data(v1,f1)
     m2.input_data(v2,f2)
-    m2.write_ply("m2.ply")
-
     m1.calc_all()
     m2.calc_all()
     m1.calc_local_coord()
+    m2.calc_local_coord()
+    m2.write_ply("deform_pre.ply")
+    m2.check_local_axis(0,"local_test")
 
-
-    dist = md.calc_f2f_distance_in_localcoord(m1, m2)
-    # dist = md.calc_f2f_distance(m2, m1)
-    colorlist,colorlist3 = md.distancelist2colorlist(dist)
-
-
-    nv,nf = md.divide_face(m1)
-
-    f0 = colorlist3[0]
-    f0z = f0[2]
-    print f0z
-    save_ply_file_color("dist_color_test.ply",nv,nf,f0z)
-
-def test2():
-    out = "./colors/"
-    if os.path.exists(out) == False:
-        os.mkdir(out)
-
-    for z in xrange(1):
-
-        m1 = m3d.model3d_changeLo()
-        m2 = m3d.model3d_changeLo()
-
-        m1.read_ply("./data/move/move%02d-shape.ply" % z)
-        m2.read_ply("./data/move/move%02d-vert.ply" % z)
-
-        m1.calc_all()
-        m2.calc_all()
-        m1.calc_local_coord()
-
-        #dist,dist_r = f2f.calc_one_frame(m1,m2)
-        dist = md.calc_f2f_distance_in_localcoord(m1,m2)
-        #dist = md.calc_f2f_distance(m2, m1)
-        c1, c2 = md.distancelist2colorlist(dist)
-        print "C2",c2
-        nv, nf = md.divide_face(m1)
-
-        frame = out + "frame%02d/" % z
-        if os.path.exists(frame) == False:
-            os.mkdir(frame)
-
-        for x in xrange(3):
-            f = c2[x]
-
-            outdir = frame + "distDataface%02d/" % x
-            if os.path.exists(outdir) == False:
-                os.mkdir(outdir)
-
-            xyz = ["x", "y", "z"]
-
-            for y in xrange(3):
-
-                f2 = f[y]
-                name = outdir + "%02d" % z + "dist_color_f%02d" % x + xyz[y] + ".ply"
-                print name
-                save_ply_file_color(name,nv,nf,f2)
-                #np.savetxt(outdir + "dist_color_f"+xyz[y] + ".txt",f2,fmt='%.10f', delimiter=',')
-
-    f0 = c2[2]
-    f0x = f0[0]
-
-
-    #save_ply_file_color("dist_color_test.ply",nv,nf,f0x)
-
-if __name__ == "__main__":
-
-    test2()

@@ -5,6 +5,7 @@ import model3d_kimu_utils as mku
 import affine_me as affine
 
 import time
+import os
 
 """""
 model3d :
@@ -42,6 +43,10 @@ class model3d:
             self.vertex_flag = True
         if self.faces.size > 0:
             self.face_flag = True
+
+    def returnVF(self):
+        return self.vertexes,self.faces
+
 
 
 #法線計算や重心計算などを加えたクラス
@@ -129,6 +134,12 @@ class model3d_plus(model3d):
 
 
 #faceごとのローカル座標を計算するクラス
+"""
+calc_all()
+calc_local_coord()
+でできる
+"""
+
 class model3d_changeLo(model3d_plus):
 
     def __init__(self):
@@ -189,7 +200,6 @@ class model3d_changeLo(model3d_plus):
             axis = np.c_[c.reshape([3,1]),x.reshape([3,1])]
             axis = np.c_[axis,y.reshape([3,1])]
             axis = np.c_[axis,z.reshape([3,1])]
-            #np.savetxt("./deform_pre2/axis%03d.txt" % fnum, axis.transpose(), fmt='%.10f')
             axis = np.r_[axis,ones]
             init_inv = np.linalg.inv(init_axis)
             axis_inv = np.linalg.inv(axis)
@@ -201,22 +211,28 @@ class model3d_changeLo(model3d_plus):
 
             #print "solve",solve
 
-            #確認用
-            """
-            dm = self.deform_p(solve,self.vertexes)
-            wri = model3d_plus()
-            wri.input_data(dm,self.faces)
-            #wri.write_ply("./deform_pre2/deform_test%03d.ply"%fnum)
-
-            solve_inv = np.linalg.inv(solve)
-            dm_inv = self.deform_p(solve_inv,dm)
-            wri.input_data(dm_inv,self.faces)
-            #wri.write_ply("./deform_pre2/deform_inv_test%03d.ply" % fnum)
-            """
-
         elapsed_time = time.time() - start
         print ("elapsed_time:{0}".format(elapsed_time)) + "[sec]"
         return solve
+
+    def check_local_axis(self,fnum,folderName):
+        # 確認用
+
+        outdir = "./" + folderName + "/"
+        if os.path.exists(outdir) == False:
+            os.mkdir(outdir)
+
+        dm = self.deform_p(self.solves[fnum],self.vertexes)
+        wri = model3d_plus()
+        wri.input_data(dm,self.faces)
+
+        wri.write_ply(outdir + "deform_test%03d.ply"%fnum)
+
+        solve_inv = np.linalg.inv(self.solves[fnum])
+        dm_inv = self.deform_p(solve_inv,dm)
+        wri.input_data(dm_inv,self.faces)
+        wri.write_ply(outdir + "deform_inv_test%03d.ply" % fnum)
+
 
 
 
