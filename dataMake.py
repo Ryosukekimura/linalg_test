@@ -29,11 +29,14 @@ def makeGraph(data):
     return newdata
 
 def main():
-    data = np.loadtxt('trans_frame003.txt')
-    new = makeGraph(data)
-    np.savetxt("frame0_comp3_l.txt", new, fmt='%.10f')
 
-    print 'before',data
+    incs = ['0000','0371','0457','0625','0747']
+
+    for num in incs:
+        name = 'trans_frame' + num + '_03.txt'
+        data = np.loadtxt(name)
+        new = makeGraph(data)
+        np.savetxt('frame'+ str(num) + '_comp3_l.txt', new, fmt='%.10f')
 
 if __name__ == "__main__":
     main()
