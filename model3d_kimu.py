@@ -68,6 +68,9 @@ class model3d_plus(model3d):
     def write_ply(self,name):
         mku.save_ply_file(name,self.vertexes,self.faces)
 
+    def write_color_ply(self, name,color):
+        mku.save_ply_file(name, self.vertexes, self.faces,color)
+
     def Normalization(self,vec):
 
         norm = np.linalg.norm(vec)
@@ -123,7 +126,7 @@ class model3d_plus(model3d):
             return c/3.0
 
     def calc_all(self):
-        print "calc normal,face center,center"
+        #print "calc normal,face center,center"
         self.calc_center()
 
         if self.face_flag == True:
@@ -212,7 +215,7 @@ class model3d_changeLo(model3d_plus):
             #print "solve",solve
 
         elapsed_time = time.time() - start
-        print ("elapsed_time:{0}".format(elapsed_time)) + "[sec]"
+        #print ("elapsed_time:{0}".format(elapsed_time)) + "[sec]"
         return solve
 
     def check_local_axis(self,fnum,folderName):
@@ -233,8 +236,28 @@ class model3d_changeLo(model3d_plus):
         wri.input_data(dm_inv,self.faces)
         wri.write_ply(outdir + "deform_inv_test%03d.ply" % fnum)
 
+    def check_local_axis_2(self,fnum,folderName,mesh):
 
+        outdir = "./" + folderName + "/"
+        if os.path.exists(outdir) == False:
+            os.mkdir(outdir)
 
+        dm = self.deform_p(self.solves[fnum], self.vertexes)
+        wri = model3d_plus()
+        wri.input_data(dm, self.faces)
+
+        wri.write_ply(outdir + "deform_test%03d.ply" % fnum)
+
+        dm = self.deform_p(self.solves[fnum], mesh.vertexes)
+        wri = model3d_plus()
+        wri.input_data(dm, mesh.faces)
+
+        wri.write_ply(outdir + "deform_test_om%03d.ply" % fnum) #om is other mesh
+
+        solve_inv = np.linalg.inv(self.solves[fnum])
+        dm_inv = self.deform_p(solve_inv, dm)
+        wri.input_data(dm_inv, self.faces)
+        wri.write_ply(outdir + "deform_inv_test%03d.ply" % fnum)
 
 
 

@@ -48,6 +48,62 @@ kend = 1
 kmin = -0.05
 kmax = 0.05
 
+def restore_p2p_distace(distance, mesh):
+    nddata = np.zeros((3, mesh.ver_num))
+    newdist = np.zeros((3, mesh.ver_num))
+
+    verCounter = np.zeros(mesh.ver_num)
+    face = mesh.faces
+
+    #print nddata
+
+    for n in xrange(mesh.face_num):
+        for m in xrange(3):
+            dist = distance[n]
+            nddata[:,face[m,n]] += dist[:,m]
+            verCounter[face[m,n]] += 1
+
+    for n in xrange(mesh.ver_num):
+        #print verCounter[n]
+        newdist[:,n] = nddata[:,n] / verCounter[n]
+
+    #print 'temp',nddata
+    #print 'rsult',newdist
+    return newdist
+
+def apply_distance_vertex(distance, invertex):
+    new_ver = invertex + distance
+    return new_ver
+
+def apply_distance(distance,mesh):
+    dtemp2 = restoreGlobalDisList(mesh.solves, distance) #local -> global
+    newdist = restore_p2p_distace(dtemp2,mesh) #face2face dist -> p2p dist
+    newver = apply_distance_vertex(newdist,mesh.vertexes) # apply dist
+
+    remesh = md.model3d_plus()
+    remesh.input_data(newver,mesh.faces)
+
+    return remesh
+
+def restoreGlobal(solve,distance):
+    invsolve = np.linalg.inv(solve)
+    init = np.array([[0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0]])
+    dist = mut.change_local(distance,invsolve) - mut.change_local(init,invsolve)
+
+    return dist
+
+def  restoreGlobalDisList(solves,distance_list):
+    redistList = reposit_distanceList(distance_list)
+    #redistList = distance_list
+    globalDisList = []
+
+    for i in xrange(len(redistList)):
+        temp = restoreGlobal(solves[i],redistList[i])
+        globalDisList.append(temp)
+    return globalDisList
+
 def set_scale(max_,min_):
     global kmax,kmin
     kmax = max_
@@ -390,6 +446,20 @@ def reposit_distanceList(distanceList):
     for dist in distanceList:
         redist = reposit_distanceVec(dist)
         returnList.append(redist)
+
+    return returnList
+
+def divide_distanceList_as_f(distanceList,face_num, frameNum):
+    """9x1 → 3x3 list用"""
+    """with all frame"""
+    """"frame 0 start"""
+
+    returnList = []
+
+    for i in xrange(face_num):
+        temp = distanceList[i]
+        temp2 = temp[:,frameNum]
+        returnList.append(temp2.reshape((9,1)))
 
     return returnList
 

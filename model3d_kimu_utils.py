@@ -29,6 +29,7 @@ def change_local(face_dist,affine):
     ones = np.array([1.0,1.0,1.0])
     fd = np.vstack((face_dist,ones))
     fd_t = affine.dot(fd)
+
     return fd_t[0:3,0:3]
 
 """""
@@ -36,6 +37,27 @@ def change_local(face_dist,affine):
     mesh2 - mesh1 を行う
     m2m_distanceを作成
 """""
+
+def defom_p(rigid_t,point):
+
+    data = point.reshape([3,1])
+    data = np.vstack((data,1))
+    trans_p = rigid_t.dot(data.reshape([4,1]))
+    trans_p = trans_p[0:3,:]
+    return trans_p.reshape([3,1])
+
+def deform_vertex(rigid_t, vertexes):
+    row, col = vertexes.shape
+    dM = np.empty([3, col])
+
+    for verNum in xrange(col):
+        data = vertexes[:, verNum]
+        data = np.hstack((data, 1))
+        tran_p = rigid_t.dot(data.reshape([4, 1]))
+        tran_p = tran_p[0:3, :]
+        dM[:, verNum] = tran_p.reshape([1, 3])
+
+    return dM.reshape([3, col])
 
 def load_ply_file(fname):
     with open(fname, 'r') as fin:
@@ -152,6 +174,10 @@ def save_ply_file_color(fname, v, f=None, colorList=None):
         for i in range(k):
             fout.write('3 %d %d %d\n' % (f[0, i], f[1, i], f[2, i]))
 
+def makeRed(num):
+    red = np.zeros((3,num))
+    red[0:,] = red[0,:] + 255
+    return red
 
 """test data"""
 
@@ -176,9 +202,9 @@ def data2():
     return v,f
 
 def data3():
-    v = np.array([[0, 1, 0]
+    v = np.array([[0, 0, 0]
                 , [0, 0, 1]
-                , [0, 0, 0]])
+                , [0, -1, 0]])
 
     f = np.array([[0],
                   [1],
@@ -186,9 +212,9 @@ def data3():
     return v,f
 
 def data4():
-    v = np.array([[0, 2, 0]
-                , [0, 0, 2]
-                , [1, 1, 1]])
+    v = np.array([[1, 1, 2]
+                , [0, 0, 1]
+                , [0, -1, 0]])
 
     f = np.array([[0],
                   [1],
@@ -196,13 +222,24 @@ def data4():
     return v,f
 
 def data5():
-    v = np.array([[0.1, 0.2, 0.3]
-                , [1, 2, 3]
-                , [10, 20, 30]])
+    v = np.array([[0, 0, 0, 0]
+                , [0, 0, 1, -1]
+                , [0, -1, 0, 0]])
 
-    f = np.array([[0],
-                  [1],
-                  [2]])
+    f = np.array([[0, 0],
+                  [1, 1],
+                  [2, 3]])
+    return v,f
+
+
+def data6():
+    v = np.array([[1, 1, 1, 1]
+                , [0, 0, 1, -1]
+                , [0, -1, 0, 0]])
+
+    f = np.array([[0, 0],
+                  [1, 1],
+                  [2, 3]])
     return v,f
 
 def red():
