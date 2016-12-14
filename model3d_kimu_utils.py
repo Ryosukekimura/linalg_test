@@ -179,6 +179,13 @@ def makeRed(num):
     red[0:,] = red[0,:] + 255
     return red
 
+def makeYellow(num):
+    y = np.zeros((3, num))
+    y[0:, ] = y[0, :] + 255
+    y[1:, ] = y[1, :] + 255
+
+    return y
+
 """test data"""
 
 def data():

@@ -18,7 +18,7 @@ useComp = 9
 compdiv = [1,comp_max]
 calcAveFlag = False
 
-out = "./pcacolors/"
+out = "./pcacolors-comp9-vi/"
 
 def readMeshes(meshName1,meshName2,AveFlag=False):
     """meshName2 - meshName2"""
@@ -42,14 +42,23 @@ def readMeshes(meshName1,meshName2,AveFlag=False):
     distances = md.change_distanceList(dtemp)
     return distances
 
-def calc_distances():
+
+
+def calc_distances(visibleLists = None,VisibleFlag = False):
     """ read frame and calc local distances of all meshes"""
 
     print "read frame:", start_frame
+    print "visible check frame ",start_frame
     m1Name = "./data/reduction_data/mrshape/rdmove%04d-shape.ply" % start_frame
     m2Name = "./data/reduction_data/mrvert/rdmove%04d-vert.ply" % start_frame
 
+
     distances = readMeshes(m1Name, m2Name)
+
+    if VisibleFlag is True:
+        for i in xrange(len(distances)):
+            if visibleLists[i, 0] == 0:
+                distances[i] = None
 
     for z in xrange(start_frame + 1, frame):
         print "read frame:", z
@@ -59,8 +68,20 @@ def calc_distances():
 
         re_dists = readMeshes(m1Name, m2Name)
 
-        for i in xrange(len(distances)):
-            distances[i] = np.hstack((distances[i], re_dists[i]))
+        if VisibleFlag is True and visibleLists is not None:
+            print "visible check frame ",z
+            for i in xrange(1000):
+                check = visibleLists[i, z]
+
+                if check == 1 and distances[i] is not None:
+                    distances[i] = np.hstack((distances[i], re_dists[i]))
+
+                elif check == 1 and distances[i] is None:
+                    distances[i] = re_dists[i]
+
+        else:
+            for i in xrange(len(distances)):
+                distances[i] = np.hstack((distances[i], re_dists[i]))
 
     return distances
 
@@ -81,14 +102,61 @@ def calcPCA(data,comp_num,pf = False):
 
     return c_ratio,evr,pca.components_,trans,trans_inv
 
-def calcPCAallFace(comp,data,FlagTpData = False):
+def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData = False):
     # calc pca
     # calc 1 face
     trans_inv_list = []
 
-    if FlagTpData == True:
-        c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, comp)
-        trans_inv_list.append(trans_inv.T)
+    if data[0] is not None:
+        row, col = data[0].shape
+        row = int(row)
+        col = int(col)
+    else:
+        col = 0
+
+    if FlagTpData is True:
+
+        if VisibleFlag is True and data[0] is None:
+            # print "visible None"
+            trans_inv = np.zeros((frame, 9))
+            trans_inv_list.append(trans_inv.T)
+            c_ratio = np.zeros(comp)
+            evr = np.zeros(comp)
+            # print 'not'
+
+        elif VisibleFlag is True and col == 1:
+            print 'visible one '
+            trans_inv = data[0].T
+            trans_inv_list.append(trans_inv.T)
+            c_ratio = np.ones(comp)
+            evr = np.ones(comp)
+
+        elif VisibleFlag is True and 1 < col < comp:
+            print 0
+            print 'rank < comp_max '
+            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, col)
+            trans_inv_list.append(trans_inv.T)
+            zero = np.zeros(comp)
+            one = np.ones(comp)
+
+            for x in xrange(len(c_ratio)):
+                zero[x] = c_ratio[x]
+                one[x] = evr[x]
+
+            c_ratio = zero
+            evr = one
+
+            print c_ratio
+
+        elif VisibleFlag is True and data[0] is not None and col >= comp:
+
+            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, comp)
+            trans_inv_list.append(trans_inv.T)
+
+        else:
+            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, comp)
+            trans_inv_list.append(trans_inv.T)
+
     else:
         c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0], comp)
         trans_inv_list.append(trans_inv)
@@ -99,13 +167,69 @@ def calcPCAallFace(comp,data,FlagTpData = False):
     for i in xrange(1, len(data)):
         # calc pca
         # calc more faces
+        #print 'face',i
+        if data[i] is not None:
+            row, col = data[i].shape
+            row = int(row)
+            col = int(col)
+        else:
+            col = 0
+
+        #rank = np.linalg.matrix_rank(data[i])
+
+
         if FlagTpData == True:
-            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, comp)
-            trans_inv_list.append(trans_inv.T)
+
+            if VisibleFlag is True and data[i] is None:
+                # print "visible None"
+                trans_inv = np.zeros((frame, 9))
+                trans_inv_list.append(trans_inv.T)
+                c_ratio = np.zeros(comp)
+                evr = np.zeros(comp)
+                # print 'not'
+
+            elif VisibleFlag is True and col == 1:
+                print 'visible one '
+                trans_inv = data[i].T
+                trans_inv_list.append(trans_inv.T)
+                c_ratio = np.ones(comp)
+                evr = np.ones(comp)
+
+            elif VisibleFlag is True and 1 < col < comp:
+                print i
+                print 'rank < comp_max '
+                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, col)
+                trans_inv_list.append(trans_inv.T)
+                zero = np.zeros(comp)
+                one = np.ones(comp)
+                for x in xrange(len(c_ratio)):
+                    zero[x] = c_ratio[x]
+                    one[x] = evr[x]
+
+                c_ratio = zero
+                evr = one
+                print c_ratio
+
+            elif VisibleFlag is True and data[i] is not None and col >= comp:
+
+                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, comp)
+                trans_inv_list.append(trans_inv.T)
+
+
+            else:
+                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, comp)
+                trans_inv_list.append(trans_inv.T)
+
+
         else:
             c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i], comp)
             trans_inv_list.append(trans_inv)
 
+        #print 'all',c_ratio_all_temp.shape
+        #print 'i',c_ratio.shape
+        #print 'data',data[i]
+        #print 'all',c_ratio_all_temp
+        #print 'cratio',c_ratio
         c_ratio_all_temp = np.vstack([c_ratio_all_temp, c_ratio])
         evr_all_temp = np.vstack([evr_all_temp, evr])
 
@@ -141,7 +265,6 @@ def saveResultPCA(outdir,applyMeshName,c_ratio_all,evr_all):
         #np.savetxt(outdir + "/" + "c_ratiocomp%02d.txt" % i, c_ratio_all[:, i], fmt='%.10f', delimiter=',')
         #np.savetxt(outdir + "/" + "evrcomp%02d.txt" % i, evr_all[:, i], fmt='%.10f', delimiter=',')
 
-
 def restoreMesh(meshName,invdist):
     shape = m3d.model3d_changeLo()
     shape.read_ply(meshName)
@@ -163,6 +286,63 @@ def restoreMeshes(outdir,meshNames,invTrans,faceNum):
         prmesh = restoreMesh(name,testlist)
         prmesh.write_ply(path + '/' + 'resotre%04d.ply'%i)
 
+def restoreMesh_visible(meshName,invdist):
+    shape = m3d.model3d_changeLo()
+    shape.read_ply(meshName)
+    shape.calc_all()
+    shape.calc_local_coord()
+
+    return md.apply_distance(invdist, shape)
+
+def restoreMeshes_visible(outdir,meshNames,invTrans,faceNum):
+
+    for i in xrange(start_frame,frame):
+        print "restore frame:",i
+        path = outdir + '/restore/ply'
+        mut.mkdir_p(path)
+
+        name = meshNames % i
+
+        testlist = md.divide_distanceList_as_f(invTrans, faceNum, i - start_frame)
+
+        #print testlist
+
+        prmesh = restoreMesh_visible(name,testlist)
+        prmesh.write_ply(path + '/' + 'resotre%04d.ply'%i)
+
+def makevisibleMatrix():
+    vi = md.readvisible("./data/visible/visibleFace%04d.txt" % start_frame)
+    for i in xrange(start_frame + 1, frame):
+        temp = md.readvisible("./data/visible/visibleFace%04d.txt" % i)
+        vi = np.vstack((vi,temp))
+
+    return vi.transpose()
+
+def restoreVisibleDistance(data,vi,fnum):
+
+    reDist = []
+    for n in xrange(fnum):
+
+        temp = np.where(vi[n,:] > 0)
+        visible = temp[0]
+        #print visible
+        if visible is not None:
+
+            box = np.array([[np.nan] * frame_num for i in range(9)])
+            for x in xrange(len(visible)) :
+                dtemp = data[n]
+
+                a =visible[x]
+
+                box[:, a] = dtemp[:, x]
+
+            reDist.append(box)
+        else:
+            box = np.array([[np.nan] * frame_num for i in range(9)])
+            reDist.append(box)
+
+    return reDist
+######################### test code #############################################
 def test2():
 
     m1 = m3d.model3d_changeLo()
@@ -201,9 +381,46 @@ def test2():
 
 def test3():
 
-    v,f = mut.data5()
-    print v
-    print md.averageDistance1Face(v)
+    m1 = m3d.model3d_changeLo()
+    m1.read_ply("./data/reduction_data/mrshape/rdmove0000-shape.ply")
+
+    """set output directry"""
+    if os.path.exists(out) == False:
+        os.mkdir(out)
+
+    visibleList = makevisibleMatrix()
+
+    distances = calc_distances(visibleList,VisibleFlag=True)
+
+    for i in xrange(len(distances)):
+        a = distances[i]
+        #print 'a',a
+
+    c_ratio_all = np.empty(1)
+    evr_all = np.empty(1)
+    trans_inv_list_allcomp = []
+
+    for comp in xrange(1, comp_max):
+        # calc pca use component 1 -> component max
+        print "pca compornent:", comp
+
+        c_ratio_all_temp, evr_all_temp, trans_inv_list = calcPCAallFace(comp, distances,visibleList,VisibleFlag=True, FlagTpData=True)
+
+        c_ratio_all = c_ratio_all_temp
+        evr_all = evr_all_temp
+
+        if comp == useComp:
+            trans_inv_list_allcomp.append(trans_inv_list)
+
+        np.savetxt(out + "/" + "c_ratiocomp%02d.txt" % comp, c_ratio_all_temp, fmt='%.10f', delimiter=',')
+        np.savetxt(out + "/" + "evrcomp%02d.txt" % comp, evr_all_temp, fmt='%.10f', delimiter=',')
+
+    redist = restoreVisibleDistance(trans_inv_list_allcomp[0], visibleList, 1000)
+
+    restoreMeshes_visible(out, "./data/reduction_data/mrshape/rdmove%04d-shape.ply",redist , 1000)
+    saveResultPCA(out, "./data/reduction_data/mrshape/rdmove0000-shape.ply", c_ratio_all, evr_all)
+
+    return 0
 
 def test4():
 
@@ -271,19 +488,59 @@ def test4():
 def test5():
 
     red = mut.makeRed(1000)
-    path = './data/restoreColor'
+    path = './data/restore-pass-comp9'
     mut.mkdir_p(path)
     for i in xrange(1000):
         m1 = m3d.model3d_plus()
-        m1.read_ply("./data/restore/ply/resotre%04d.ply"%i)
+        m1.read_ply("./pcacolors-comp9/restore/ply/resotre%04d.ply"%i)
         m1.write_color_ply(path + '/restore%04d.ply'%i,red)
 
 def test6():
 
+    vi = md.readvisible("./data/visible/visibleFace0319.txt")
+    m = m3d.model3d_changeLo()
+    m.read_ply("./data/reduction_data/mrvert/rdmove0319-vert.ply")
+    v,f = md.divide_face(m)
+    c = md.showVisibleAsColor(vi)
+    c2 = md.color2color_x_3(c)
+    print v.shape
+    mut.save_ply_file_color("visibleCheck.ply",v,f,c2)
+
     return 0
+
+def test7():
+    vi = makevisibleMatrix()
+    np.savetxt("visual.txt",vi,fmt='%d', delimiter=',')
+
+    dist = calc_distances(vi, VisibleFlag=True)
+    redist = restoreVisibleDistance(dist,vi,1000)
+
+    restoreMeshes_visible("./", "./data/reduction_data/mrshape/rdmove%04d-shape.ply", redist, 1000)
+    """
+    for i in xrange(len(dist)):
+        if dist[i] is not None:
+            print dist[i].shape
+        else:
+            print 'None'
+    """
+
+def test8():
+    m1 = m3d.model3d_changeLo()
+    m2 = m3d.model3d_changeLo()
+
+    m1.read_ply("./data/reduction_data/mrshape/rdmove0000-shape.ply")
+    m2.read_ply("./restore/ply/resotre0000.ply")
+
+    m1.calc_all()
+    m1.calc_local_coord()
+
+    dist = md.calc_normalvec_distance(m1,m2)
+
+    #dist = md.calc_f2f_distance_in_localcoord(m1,m2)
+    md.printColorAsPly(m2,dist,'restoreCheck0000.ply',if3 = False)
 
 
 if __name__ == "__main__":
 
-    test2()
+    test3()
 

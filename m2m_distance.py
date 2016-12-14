@@ -58,6 +58,12 @@ def restore_p2p_distace(distance, mesh):
     #print nddata
 
     for n in xrange(mesh.face_num):
+        dt = distance[n]
+        print dt[0,0]
+        if dt[0,0] != dt[0,0]:
+            print 'continue'
+            continue
+
         for m in xrange(3):
             dist = distance[n]
             nddata[:,face[m,n]] += dist[:,m]
@@ -65,7 +71,10 @@ def restore_p2p_distace(distance, mesh):
 
     for n in xrange(mesh.ver_num):
         #print verCounter[n]
-        newdist[:,n] = nddata[:,n] / verCounter[n]
+        if verCounter[n] == 0:
+            newdist[:, n] = nddata[:, n]
+        else:
+            newdist[:,n] = nddata[:,n] / verCounter[n]
 
     #print 'temp',nddata
     #print 'rsult',newdist
@@ -100,8 +109,14 @@ def  restoreGlobalDisList(solves,distance_list):
     globalDisList = []
 
     for i in xrange(len(redistList)):
-        temp = restoreGlobal(solves[i],redistList[i])
-        globalDisList.append(temp)
+
+        distif = redistList[i]
+        if distif[0,0] != distif[0,0]:
+            box = np.array([[np.nan] for i in range(9)])
+            globalDisList.append(box)
+        else:
+            temp = restoreGlobal(solves[i],redistList[i])
+            globalDisList.append(temp)
     return globalDisList
 
 def set_scale(max_,min_):
@@ -145,6 +160,31 @@ def calc_f2f_distance_in_localcoord(mesh1,mesh2):
 
     return distList
 
+def calc_f2f_distance_in_localcoord_onlyVisible(mesh1,mesh2,visibleList):
+    f2 = mesh2.faces
+    v2 = mesh2.vertexes
+    f1 = mesh1.faces
+    v1 = mesh1.vertexes
+
+    row, col = f2.shape
+
+    distList = []
+
+    for s in xrange(col):
+        dist = mut.change_local(v2[:, f2[:, s]],mesh1.solves[s]) - mut.change_local(v1[:, f1[:, s]],mesh1.solves[s])
+        distList.append(dist)
+
+    """
+    データ構造解説
+    dist = ([d0x,d1x,d2x]
+            [d0y,d1y,d2y]
+            [d0z,d1z,d2z])
+
+    distList = dist0,dist1,dist2...distN
+
+    """
+
+    return distList
 
 def calc_f2f_distance(mesh1,mesh2):
 
@@ -420,7 +460,6 @@ def divide_face(mesh):
 def DistanceList2DistancecVec(distanceList,faceNum):
     return np.array(distanceList).reshape(faceNum*9,1)
 
-
 def change_distanceVec(distance):
     """3x3 → 9x1"""
     return distance.reshape(9,1,order = "F")
@@ -504,6 +543,7 @@ def printColorAsPly(mesh,distanceList,name,if3 = True):
 
     mut.save_ply_file_color(name,nv,nf,col)
 
+
 def averageDistance1Face(dist):
 
     a = dist[:, 0]
@@ -522,3 +562,17 @@ def averageDistnaceList(distnaceList):
         reList.append(averageDistance1Face(x))
 
     return reList
+
+def readvisible(name):
+    return np.loadtxt(name,dtype=int)
+
+def showVisibleAsColor(visibleList):
+    color = np.zeros((3,len(visibleList)))
+
+    for i in xrange(len(visibleList)):
+        if visibleList[i] == 1:
+            color[0,i] = 255
+        else:
+            color[:,i] = 127
+
+    return color
