@@ -59,7 +59,7 @@ def restore_p2p_distace(distance, mesh):
 
     for n in xrange(mesh.face_num):
         dt = distance[n]
-        print dt[0,0]
+        #print dt[0,0]
         if dt[0,0] != dt[0,0]:
             print 'continue'
             continue

@@ -18,6 +18,8 @@ def mkdir_p(path):
         else:
             raise
 
+    return path
+
 def makedir(dir):
 
     if os.path.exists(dir) == False:
@@ -58,6 +60,14 @@ def deform_vertex(rigid_t, vertexes):
         dM[:, verNum] = tran_p.reshape([1, 3])
 
     return dM.reshape([3, col])
+
+def deformMesh(rigid,mesh):
+    rm = m3d.model3d_plus()
+    v,f = mesh.returnVF()
+    rv = deform_vertex(rigid,v)
+    rm.input_data(rv,f)
+
+    return rm
 
 def load_ply_file(fname):
     with open(fname, 'r') as fin:

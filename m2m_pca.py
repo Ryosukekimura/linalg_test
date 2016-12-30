@@ -7,18 +7,26 @@ import model3d_kimu as m3d
 import m2m_distance as md
 import os
 import model3d_kimu_utils as mut
+import dataMake
 
-start_frame = 0
-frame_num = 1000
+start_frame = 30
+frame_num = 50
 frame = start_frame + frame_num
 comp_max = 10 #最大次元数より+1
 
-useComp = 9
-
-compdiv = [1,comp_max]
+face_Num = 960
 calcAveFlag = False
 
-out = "./pcacolors-comp9-vi/"
+#test data
+useComp = 3
+
+skipFrame = 40
+progSkipFrame = skipFrame - start_frame
+
+#compdiv = [1,comp_max]
+
+
+out = "./pcalearn-comp3/"
 
 def readMeshes(meshName1,meshName2,AveFlag=False):
     """meshName2 - meshName2"""
@@ -42,15 +50,20 @@ def readMeshes(meshName1,meshName2,AveFlag=False):
     distances = md.change_distanceList(dtemp)
     return distances
 
-
+def savedistance(dir,distance):
+    path = mut.mkdir_p(dir)
+    for i in xrange(face_Num):
+        np.savetxt(dir + '/distface%04d.txt'%i,distance[i],fmt='%10f')
 
 def calc_distances(visibleLists = None,VisibleFlag = False):
     """ read frame and calc local distances of all meshes"""
 
     print "read frame:", start_frame
     print "visible check frame ",start_frame
-    m1Name = "./data/reduction_data/mrshape/rdmove%04d-shape.ply" % start_frame
-    m2Name = "./data/reduction_data/mrvert/rdmove%04d-vert.ply" % start_frame
+
+
+    m1Name = "./data/cloth4ply/mrshape/ball0000.ply"
+    m2Name = "./data/cloth4ply/mrvert/cloth0000.ply"
 
 
     distances = readMeshes(m1Name, m2Name)
@@ -63,14 +76,19 @@ def calc_distances(visibleLists = None,VisibleFlag = False):
     for z in xrange(start_frame + 1, frame):
         print "read frame:", z
 
-        m1Name = "./data/reduction_data/mrshape/rdmove%04d-shape.ply" % z
-        m2Name = "./data/reduction_data/mrvert/rdmove%04d-vert.ply" % z
+        m1Name = "./data/cloth4ply/mrshape/ball%04d.ply" % z
+        m2Name = "./data/cloth4ply/mrvert/cloth%04d.ply" % z
 
         re_dists = readMeshes(m1Name, m2Name)
 
+        if skipFrame is not None and z == skipFrame:
+            print 'skip:',z
+            savedistance(out + 'frame%04d' % z,re_dists)
+            continue
+
         if VisibleFlag is True and visibleLists is not None:
             print "visible check frame ",z
-            for i in xrange(1000):
+            for i in xrange(face_Num):
                 check = visibleLists[i, z]
 
                 if check == 1 and distances[i] is not None:
@@ -93,6 +111,7 @@ def calcPCA(data,comp_num,pf = False):
     evr = np.cumsum(pca.explained_variance_ratio_)
     trans = pca.transform(data)
     trans_inv = pca.inverse_transform(trans)
+    mean = pca.mean_
 
     if pf == True:
         print '寄与率', c_ratio
@@ -100,12 +119,15 @@ def calcPCA(data,comp_num,pf = False):
         print '主成分'
         print pca.components_
 
-    return c_ratio,evr,pca.components_,trans,trans_inv
+    return c_ratio,evr,pca.components_,trans,trans_inv,mean
 
 def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData = False):
     # calc pca
     # calc 1 face
     trans_inv_list = []
+    trans_list = []
+    n_components = []
+    means = []
 
     if data[0] is not None:
         row, col = data[0].shape
@@ -120,6 +142,7 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
             # print "visible None"
             trans_inv = np.zeros((frame, 9))
             trans_inv_list.append(trans_inv.T)
+            #trans_list.append(trans_inv.T)
             c_ratio = np.zeros(comp)
             evr = np.zeros(comp)
             # print 'not'
@@ -134,8 +157,12 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
         elif VisibleFlag is True and 1 < col < comp:
             print 0
             print 'rank < comp_max '
-            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, col)
+            c_ratio, evr, components, trans_datas, trans_inv, mean= calcPCA(data[0].T, col)
             trans_inv_list.append(trans_inv.T)
+            trans_list.append(trans_datas)
+            n_components.append(components)
+            means.append(mean)
+
             zero = np.zeros(comp)
             one = np.ones(comp)
 
@@ -146,20 +173,29 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
             c_ratio = zero
             evr = one
 
-            print c_ratio
+            #print c_ratio
 
         elif VisibleFlag is True and data[0] is not None and col >= comp:
 
-            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, comp)
+            c_ratio, evr, components, trans_datas, trans_inv, mean= calcPCA(data[0].T, comp)
             trans_inv_list.append(trans_inv.T)
+            trans_list.append(trans_datas)
+            n_components.append(components)
+            means.append(mean)
 
         else:
-            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0].T, comp)
+            c_ratio, evr, components, trans_datas, trans_inv, mean = calcPCA(data[0].T, comp)
             trans_inv_list.append(trans_inv.T)
+            trans_list.append(trans_datas)
+            n_components.append(components)
+            means.append(mean)
 
     else:
-        c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[0], comp)
+        c_ratio, evr, components, trans_datas, trans_inv,mean = calcPCA(data[0], comp)
         trans_inv_list.append(trans_inv)
+        trans_list.append(trans_datas)
+        n_components.append(components)
+        means.append(mean)
 
     c_ratio_all_temp = c_ratio
     evr_all_temp = evr
@@ -198,8 +234,11 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
             elif VisibleFlag is True and 1 < col < comp:
                 print i
                 print 'rank < comp_max '
-                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, col)
+                c_ratio, evr, components, trans_datas, trans_inv, mean = calcPCA(data[i].T, col)
                 trans_inv_list.append(trans_inv.T)
+                trans_list.append(trans_datas)
+                n_components.append(components)
+                means.append(mean)
                 zero = np.zeros(comp)
                 one = np.ones(comp)
                 for x in xrange(len(c_ratio)):
@@ -212,18 +251,26 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
 
             elif VisibleFlag is True and data[i] is not None and col >= comp:
 
-                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, comp)
+                c_ratio, evr, components, trans_datas, trans_inv, mean = calcPCA(data[i].T, comp)
                 trans_inv_list.append(trans_inv.T)
-
+                trans_list.append(trans_datas)
+                n_components.append(components)
+                means.append(mean)
 
             else:
-                c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i].T, comp)
+                c_ratio, evr, components, trans_datas, trans_inv, mean = calcPCA(data[i].T, comp)
                 trans_inv_list.append(trans_inv.T)
+                trans_list.append(trans_datas)
+                n_components.append(components)
+                means.append(mean)
 
 
         else:
-            c_ratio, evr, components, trans_datas, trans_inv = calcPCA(data[i], comp)
+            c_ratio, evr, components, trans_datas, trans_inv, mean = calcPCA(data[i], comp)
             trans_inv_list.append(trans_inv)
+            trans_list.append(trans_datas)
+            n_components.append(components)
+            means.append(mean)
 
         #print 'all',c_ratio_all_temp.shape
         #print 'i',c_ratio.shape
@@ -233,7 +280,7 @@ def calcPCAallFace(comp,data,visibleList = None,VisibleFlag = False,FlagTpData =
         c_ratio_all_temp = np.vstack([c_ratio_all_temp, c_ratio])
         evr_all_temp = np.vstack([evr_all_temp, evr])
 
-    return c_ratio_all_temp,evr_all_temp,trans_inv_list
+    return c_ratio_all_temp,evr_all_temp,n_components,trans_inv_list,trans_list,means
 
 def calcPCAallComp():
 
@@ -277,6 +324,7 @@ def restoreMeshes(outdir,meshNames,invTrans,faceNum):
 
     for i in xrange(start_frame,frame):
         print "restore frame:",i
+        print 'restore dist mat',i - start_frame
         path = outdir + '/restore/ply'
         mut.mkdir_p(path)
 
@@ -343,41 +391,85 @@ def restoreVisibleDistance(data,vi,fnum):
 
     return reDist
 ######################### test code #############################################
+
+def dataMakesAllface(datas,trans,components, means,params,skip = None):
+
+
+    rts = params
+
+    old = mut.mkdir_p(out + 'learn/')
+    if skip is not None:
+        skipp,rts = dataMake.dataSkip(skip, params)
+        print skipp
+        np.savetxt(old + '/skip%04dParam.txt'%(skip + start_frame),skipp,delimiter=',')
+
+    for i in xrange(face_Num):
+        #print 'face:',i
+        name = old + '/testf%04d.npz' % i
+        dataMake.dataMake(dataName= name, datas=datas[i].T, param=rts, transdata=trans[i].T, component=components[i].T, mean=means[i])
+
+
 def test2():
 
     m1 = m3d.model3d_changeLo()
-    m1.read_ply("./data/reduction_data/mrshape/rdmove0000-shape.ply")
+    m1.read_ply("./data/cloth4ply/mrshape/ball0000.ply")
 
     """set output directry"""
     if os.path.exists(out) == False:
         os.mkdir(out)
 
     distances = calc_distances()
-
+    a = distances[0]
+    print a.shape
     c_ratio_all = np.empty(1)
     evr_all = np.empty(1)
 
     #print distances[0]
 
     trans_inv_list_allcomp = []
+    trans_list_allcomp = []
+    n_components_allcomp = []
+    mean_allcomp = []
 
     for comp in xrange(1,comp_max):
         # calc pca use component 1 -> component max
         print "pca compornent:",comp
 
-        c_ratio_all_temp,evr_all_temp,trans_inv_list = calcPCAallFace(comp,distances,FlagTpData=True)
+        c_ratio_all_temp,evr_all_temp,components,trans_inv_list,trans_list, means = calcPCAallFace(comp, distances, FlagTpData=True)
 
         c_ratio_all = c_ratio_all_temp
         evr_all = evr_all_temp
 
         if comp == useComp:
             trans_inv_list_allcomp.append(trans_inv_list)
+            mean_allcomp.append(means)
+            trans_list_allcomp.append(trans_list)
+            n_components_allcomp.append(components)
 
-        np.savetxt(out + "/" + "c_ratiocomp%02d.txt" % comp, c_ratio_all_temp, fmt='%.10f', delimiter=',')
-        np.savetxt(out + "/" + "evrcomp%02d.txt" % comp, evr_all_temp, fmt='%.10f', delimiter=',')
+        else:
+            trans_inv_list_allcomp.append(None)
+            mean_allcomp.append(None)
+            trans_list_allcomp.append(None)
+            n_components_allcomp.append(None)
 
-    restoreMeshes(out,"./data/reduction_data/mrshape/rdmove%04d-shape.ply",trans_inv_list_allcomp[0],1000)
-    saveResultPCA(out,"./data/reduction_data/mrshape/rdmove0000-shape.ply",c_ratio_all,evr_all)
+        np.savetxt(out + "/" + "c_ratiocomp%02d.txt" % comp, c_ratio_all_temp, fmt='%.20f', delimiter=',')
+        np.savetxt(out + "/" + "evrcomp%02d.txt" % comp, evr_all_temp, fmt='%.20f', delimiter=',')
+
+    m = mean_allcomp[useComp -1]
+    t = trans_list_allcomp[useComp -1]
+    c = n_components_allcomp[useComp -1]
+
+    dataMake.setFrame(start_frame, frame)
+    rts = dataMake.calcRotTranses("./data/cloth4ply/mrshape/ball%04d.ply")
+
+
+    dataMakesAllface(distances, t, c, m,rts, progSkipFrame)
+
+
+    #restoreMeshes(out,"./data/cloth4ply/mrshape/ball%04d.ply",trans_inv_list_allcomp[useComp - 1],m1.face_num)
+    saveResultPCA(out,"./data/cloth4ply/mrshape/ball0000.ply",c_ratio_all,evr_all)
+
+
 
 def test3():
 
@@ -392,9 +484,11 @@ def test3():
 
     distances = calc_distances(visibleList,VisibleFlag=True)
 
-    for i in xrange(len(distances)):
-        a = distances[i]
-        #print 'a',a
+
+
+    #for i in xrange(len(distances)):
+    #    a = distances[i]
+    #    #print 'a',a
 
     c_ratio_all = np.empty(1)
     evr_all = np.empty(1)
@@ -427,8 +521,10 @@ def test4():
     m1 = m3d.model3d_changeLo()
     m2 = m3d.model3d_changeLo()
 
-    m1.read_ply("./data/reduction_data/mrshape/rdmove0100-shape.ply")
-    m2.read_ply("./data/reduction_data/mrvert/rdmove0100-vert.ply")
+    m1.read_ply("./data/cloth4ply/mrshape/ball%04d.ply"%50)
+    m2.read_ply("./data/cloth4ply/mrvert/cloth%04d.ply"%50)
+
+    print 'fnum',m1.face_num
 
     v,f = mut.data5()
     #m1.input_data(v,f)
@@ -542,5 +638,5 @@ def test8():
 
 if __name__ == "__main__":
 
-    test3()
+    test2()
 
